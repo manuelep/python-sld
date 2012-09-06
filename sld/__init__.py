@@ -1384,7 +1384,7 @@ class StyledLayerDescriptor(SLDNode):
     _cached_schema = None
     """A cached schema document, to prevent multiple requests from occurring."""
 
-    def __init__(self, sld_file=None):
+    def __init__(self, sld_file=None, update_schema=False):
         """
         Create a new SLD document. If an sld file is provided, this constructor
         will fetch the SLD schema from the internet and validate the file 
@@ -1399,11 +1399,33 @@ class StyledLayerDescriptor(SLDNode):
             logging.debug('Storing new schema into cache.')
 
             localschema = NamedTemporaryFile(delete=False)
+
             schema_url = 'http://schemas.opengis.net/sld/1.0.0/StyledLayerDescriptor.xsd'
-            resp = urllib2.urlopen(schema_url)
-            localschema.write(resp.read())
-            resp.close()
+            
+            localschema_backup_path = './StyledLayerDescriptor-backup.xsd'
+            
+            if update_schema:
+                try:
+                    urllib2.urlopen(schema_url)
+                except urllib2.URLError:
+                    pass
+                else:
+                    os.remove(localschema_backup_path)
+            
+            try:
+                localschema_backup = open(localschema_backup_path, 'r')
+            except IOError:
+                localschema_backup = open(localschema_backup_path, 'w')
+            
+                resp = urllib2.urlopen(schema_url)
+                localschema_backup.write(resp.read())
+                resp.close()
+                localschema_backup.close()
+                localschema_backup = open(localschema_backup_path, 'r')
+            
+            localschema.write(localschema_backup.read())
             localschema.seek(0)
+            localschema_backup.close()
 
             theschema = parse(localschema)
             localschema.close()
@@ -1416,11 +1438,9 @@ class StyledLayerDescriptor(SLDNode):
             theschema = parse(localschema)
             localschema.close()
 
-        self._schema = XMLSchema(theschema)
-
         if not sld_file is None:
             self._node = parse(sld_file)
-
+            self._schema = XMLSchema(theschema)
             if not self._schema.validate(self._node):
                 logging.warn('SLD File "%s" does not validate against the SLD schema.', sld_file)
         else:
