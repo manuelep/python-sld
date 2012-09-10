@@ -1438,6 +1438,8 @@ class StyledLayerDescriptor(SLDNode):
             theschema = parse(localschema)
             localschema.close()
 
+        self._theschema = theschema
+
         if not sld_file is None:
             self._node = parse(sld_file)
             self._schema = XMLSchema(theschema)
@@ -1488,7 +1490,10 @@ class StyledLayerDescriptor(SLDNode):
         @return: A flag indicating if the SLD is valid.
         """
         self.normalize()
-
+        
+        if not hasattr(self, '_schema'):
+            self._schema = XMLSchema(self._theschema)
+        
         if self._node is None or self._schema is None:
             logging.debug('The node or schema is empty, and cannot be validated.')
             return False
